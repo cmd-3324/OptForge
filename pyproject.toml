@@ -15,8 +15,10 @@ dependencies = [
 ]
 
 [project.scripts]
-optforge = "optforge:main"
-
+optforge = "optforge.diskcheck.cli:app"
+envcheck = "optforge.envcheck.cli:app"
+portcheck = "optforge.portcheck.cli:app"
+pycacheClean = "optforge.pycacheClean.cli:app"
 [build-system]
 requires = ["uv_build>=0.12.22,<0.13.0"]
 build-backend = "uv_build"

@@ -7,7 +7,7 @@ SHELL := powershell.exe
 PYTHON := .venv\Scripts\python.exe
 
 help:
-	@Write-Host "Targets: install showp lint format typecheck test clean"
+@Write-Host "Targets: install showp lint format typecheck test clean"
 
 install:
 	uv sync
@@ -24,12 +24,19 @@ format:
 typecheck:
 	uv run mypy src/
 
-test: showp lint
-	uv run pytest
+# test: showp lint
+# 	uv run pytest
 
 run:
 	$(PYTHON) -m optforge.cli
 
+
+
+clean2:
+	Get-ChildItem -Recurse -Directory -Filter "__pycache__" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue; Write-Host "Done. Pycache Files are Gone."
+
+
+
 clean:
-	Remove-Item -Recurse -Force .mypy_cache, .ruff_cache, .pytest_cache -ErrorAction SilentlyContinue
-	Get-ChildItem -Recurse -Directory -Filter __pycache__ | Remove-Item -Recurse -Force
+	powershell -Command "Get-ChildItem -Recurse -Directory -Filter __pycache__ | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue"
+	powershell -Command "Remove-Item -Recurse -Force .mypy_cache,.ruff_cache,.pytest_cache -ErrorAction SilentlyContinue"

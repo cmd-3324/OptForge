@@ -9,11 +9,9 @@ Exit codes
     2  invalid usage (raised by Typer)
     3  runtime error (permission denied, OS error)
 """
-lazy import re
 import dataclasses
 import json
 import time
-
 from collections.abc import Iterator
 from contextlib import contextmanager, nullcontext
 from enum import Enum, IntEnum

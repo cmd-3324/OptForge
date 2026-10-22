@@ -1,71 +1,70 @@
-"""
-core.py — Core logic for pycacheClean CLI tool
-"""
+"""Utility functions for cleaning Python cache folders."""
+
+from __future__ import annotations
+
 import os
-import shutil
+from pathlib import Path
 
 
-def find_pycache_dirs(
-    base_dir: str,
-    exclude_dirs: list[str] | None = None,
+def find_cache_dirs(
+    root: str | os.PathLike[str],
+    *,
+    recursive: bool = True,
     max_depth: int | None = None,
-) -> list[str]:
-  """
-    Walk through directory tree and find all __pycache__ folders.
-    
-    Args:
-        base_dir: Root directory to scan
-        exclude_dirs: Folders to skip (e.g., 'venv', '.git')
-        max_depth: How many levels deep to go (None = unlimited)
-    
-    Returns:
-        List of full paths to __pycache__ directories
-    """
-  pycache_dirs = []
-  exclude_dirs = exclude_dirs or []
-  for root, dirs, files in os.walk(base_dir):
-    if max_depth is not None:
-      current_depth = root.replace(base_dir, "").count(os.sep)
-      if current_depth > max_depth:
-        dirs.clear()
-        # stop descending
-        continue
-    # Skip excluded directories
-    rel_path = os.path.relpath(root, base_dir)
-    parts = rel_path.split(os.sep)
-    if any(excluded in parts for excluded in exclude_dirs):
-      dirs.clear()
-      continue
-    # Collect __pycache__ folders
-    for dir_name in dirs:
-      if dir_name == "__pycache__":
-        pycache_dirs.append(os.path.join(root, dir_name))
-  return pycache_dirs
+    exclude: set[str] | None = None,
+) -> list[Path]:
+    """Return all __pycache__ directories beneath a root."""
+    root_path = Path(root)
+    exclude = exclude or set()
+    matches: list[Path] = []
+
+    if not root_path.exists():
+        return matches
+
+    if recursive:
+        iterator = root_path.rglob("__pycache__")
+    else:
+        iterator = root_path.glob("__pycache__")
+
+    for path in iterator:
+        if not path.is_dir():
+            continue
+        if any(part in exclude for part in path.parts):
+            continue
+        if max_depth is not None:
+            relative_to_root = path.relative_to(root_path)
+            if len(relative_to_root.parts) > max_depth:
+                continue
+        matches.append(path)
+
+    return sorted({p.resolve() for p in matches}, key=lambda p: str(p))
 
 
-def remove_pycache_dirs(
-    pycache_list: list[str],
+def clean_pycache(
+    root: str | os.PathLike[str] = ".",
+    *,
+    recursive: bool = True,
+    max_depth: int | None = None,
+    exclude: set[str] | None = None,
     dry_run: bool = False,
-) -> dict:
-  """
-    Remove __pycache__ directories.
-    
-    Args:
-        pycache_list: List of paths to remove
-        dry_run: If True, only report what would be deleted
-    
-    Returns:
-        Dict with 'success', 'failed', and 'errors' counts
-    """
-  result = {"success": 0, "failed": 0, "errors": []}
-  for cache_path in pycache_list:
-    try:
-      if dry_run:
-        print(f"[DRY RUN] Would remove: {cache_path}")
-        result["success"] += 1
-      else:
-        shutil.rmtree(cache_path)
-        result["success"] += 1
-    except Exception as e:
-        return e
-  return result
+) -> list[str]:
+    """Delete __pycache__ directories found under a root."""
+    cleaned: list[str] = []
+    for path in find_cache_dirs(root, recursive=recursive, max_depth=max_depth, exclude=exclude):
+        if dry_run:
+            cleaned.append(str(path))
+            continue
+        try:
+            for child in sorted(path.iterdir(), reverse=True):
+                if child.is_file() or child.is_symlink():
+                    child.unlink()
+                elif child.is_dir():
+                    if child.name == "__pycache__":
+                        continue
+                    for nested in clean_pycache(child, recursive=True, max_depth=max_depth, exclude=exclude, dry_run=False):
+                        pass
+            path.rmdir()
+            cleaned.append(str(path))
+        except OSError:
+            continue
+    return cleaned

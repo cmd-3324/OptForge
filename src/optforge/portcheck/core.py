@@ -37,12 +37,7 @@ class ConnectResult:
 
 
 def get_listeners() -> list[Listener]:
-    """Every listening TCP socket on this machine.
-
-    Hint: psutil.net_connections(kind="tcp"), keep status == psutil.CONN_LISTEN.
-    Look up names with psutil.Process(pid).name() inside try/except psutil.Error.
-    Convert psutil.AccessDenied into PermissionDenied.
-    """
+    """Every listening TCP socket on this machine."""
     try:
         connections = psutil.net_connections(kind="tcp")
     except psutil.AccessDenied as exc:
@@ -58,8 +53,8 @@ def get_listeners() -> list[Listener]:
         port = conn.laddr.port
         address = conn.laddr.ip or "0.0.0.0"
         pid = conn.pid
-
         process_name = "-"
+
         if pid is not None:
             try:
                 process_name = psutil.Process(pid).name()
@@ -76,44 +71,27 @@ def get_listeners() -> list[Listener]:
 
 
 def can_bind(port: int, host: str) -> bool:
-    """True if a TCP socket can bind to host:port right now.
-
-    Hint: socket.socket(), bind((host, port)), return False on OSError, always
-    close the socket. On Windows do NOT set SO_REUSEADDR (it lets two sockets
-    share a port and would make a busy port look free).
-    """
+    """True if a TCP socket can bind to host:port right now."""
     try:
         family = socket.AF_INET6 if ":" in host else socket.AF_INET
         sock = socket.socket(family, socket.SOCK_STREAM)
-        try:
-            sock.bind((host, port))
-        except OSError:
-            return False
-        else:
-            return True
-        finally:
-            sock.close()
     except OSError:
         return False
 
+    try:
+        sock.bind((host, port))
+        return True
+    except OSError:
+        return False
+    finally:
+        sock.close()
+
 
 def can_connect(host: str, port: int, timeout: float) -> ConnectResult:
-    """Try a TCP connection to host:port.
-
-    Hint: socket.create_connection((host, port), timeout=timeout), time it with
-    time.perf_counter(), catch OSError and put a short reason in `error`.
-    """
+    """Try a TCP connection to host:port and return structured status."""
     start = time.perf_counter()
     try:
         with socket.create_connection((host, port), timeout=timeout):
-            return ConnectResult(
-                ok=True,
-                seconds=time.perf_counter() - start,
-                error=None,
-            )
+            return ConnectResult(ok=True, seconds=time.perf_counter() - start, error=None)
     except OSError as exc:
-        return ConnectResult(
-            ok=False,
-            seconds=None,
-            error=str(exc),
-        )
+        return ConnectResult(ok=False, seconds=None, error=str(exc))

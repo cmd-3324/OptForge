@@ -1,24 +1,33 @@
 [project]
 name = "optforge"
 version = "0.1.0"
-description = "Add your description here"
+description = "Small cross-platform developer CLI tools: inspect ports, check environment variables, monitor disk space, and clean Python cache files."
 readme = "README.md"
 authors = [
     { name = "Max Miller", email = "ali.alipour4576@gmail.com" }
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 dependencies = [
     "pathlib>=1.0.1",
-    "psutils>=3.3.17",
-    "rich>=15.0.0",
-    "typer>=0.27.3",
+    "psutil>=7.0.0",
+    "rich>=13.0.0",
+    "typer>=0.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.6.0",
+    "mypy>=1.10.0",
 ]
 
 [project.scripts]
-optforge = "optforge.diskcheck.cli:app"
+optforge = "optforge:main"
+diskcheck = "optforge.diskcheck.cli:app"
 envcheck = "optforge.envcheck.cli:app"
 portcheck = "optforge.portcheck.cli:app"
 pycacheClean = "optforge.pycacheClean.cli:app"
+
 [build-system]
-requires = ["uv_build>=0.12.22,<0.13.0"]
-build-backend = "uv_build"
+requires = ["hatchling>=1.24.0"]
+build-backend = "hatchling.build"

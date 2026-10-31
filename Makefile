@@ -1,42 +1,37 @@
-.PHONY: help install showp lint format typecheck test clean run
+.PHONY: help install lint format typecheck test check build clean
 
-# Force PowerShell so pipes/Select-Object work as you expect
-SHELL := powershell.exe
-.SHELLFLAGS := -NoProfile -Command
-
-PYTHON := .venv\Scripts\python.exe
+UV ?= uv
 
 help:
-@Write-Host "Targets: install showp lint format typecheck test clean"
+	@echo "OptForge targets"
+	@echo "  install    Sync the virtual environment (uv sync --all-extras)"
+	@echo "  lint       Run ruff"
+	@echo "  format     Format with ruff"
+	@echo "  typecheck  Run mypy"
+	@echo "  test       Run pytest"
+	@echo "  check      lint + typecheck + test"
+	@echo "  build      Build sdist and wheel"
+	@echo "  clean      Remove caches and build artifacts"
 
 install:
-	uv sync
-
-showp:
-	$(PYTHON) --version
+	$(UV) sync --all-extras
 
 lint:
-	uv run ruff check src/ tests/
+	$(UV) run ruff check .
 
 format:
-	uv run ruff format src/ tests/
+	$(UV) run ruff format .
 
 typecheck:
-	uv run mypy src/
+	$(UV) run mypy src
 
-# test: showp lint
-# 	uv run pytest
+test:
+	$(UV) run pytest
 
-run:
-	$(PYTHON) -m optforge.cli
+check: lint typecheck test
 
-
-
-clean2:
-	Get-ChildItem -Recurse -Directory -Filter "__pycache__" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue; Write-Host "Done. Pycache Files are Gone."
-
-
+build:
+	$(UV) build
 
 clean:
-	powershell -Command "Get-ChildItem -Recurse -Directory -Filter __pycache__ | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue"
-	powershell -Command "Remove-Item -Recurse -Force .mypy_cache,.ruff_cache,.pytest_cache -ErrorAction SilentlyContinue"
+	$(UV) run python -c "import pathlib, shutil; [shutil.rmtree(p, ignore_errors=True) for p in pathlib.Path('.').rglob('__pycache__')]; [shutil.rmtree(p, ignore_errors=True) for p in ('.mypy_cache', '.ruff_cache', '.pytest_cache', 'dist', 'build')]"

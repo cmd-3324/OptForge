@@ -15,7 +15,7 @@ It helps you:
 - test a host/port connection from the terminal
 - review environment variables and runtime context
 - monitor disk space and storage pressure
-- remove stale Python cache artifacts from local projects
+- remove stale Python cache artifacts from local projects, without scanning `venv` or `.venv`
 
 ## Why use OptForge?
 
@@ -48,8 +48,8 @@ It is designed to be simple, fast, and cross-platform.
 ### Python cache cleanup
 
 - remove `__pycache__` directories and stale Python bytecode files
-- help keep workspaces clean and reduce clutter
-- useful for large repositories or repeated development cycles
+- skip virtual environments (`venv` and `.venv`) instead of scanning them
+- help keep workspaces clean without walking dependency trees
 
 ## Installation
 
@@ -124,9 +124,12 @@ diskcheck
 
 ### Clean Python cache files
 
+`pycacheClean` searches a project for `__pycache__` directories and deletes them. Folders named `venv` or `.venv` are ignored so virtualenv bytecode is left alone and the scan stays fast.
+
 ```bash
+pycacheClean --dry-run
 pycacheClean --recursive
-pycacheClean --depth 2
+pycacheClean --max-depth 2
 ```
 
 ## Project structure

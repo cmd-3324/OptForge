@@ -1,166 +1,94 @@
-"""portcheck: inspect listening ports, test whether a port is free, check connectivity.
-
-This module is the command-line layer only: it parses arguments, calls
-``optforge.portcheck.core`` and prints results. All real work lives in core.py.
+"""``portcheck``: inspect listening ports, test bindability, check connectivity.
 
 Exit codes
-    0  success, or the answer is "yes" (port free / process found / host reachable)
-    1  the check ran fine but the answer is "no"
+    0  the answer is yes (free / found / connected / reached)
+    1  the answer is no (in use / missing / unreachable / timed out)
     2  invalid usage (raised by Typer)
-    3  runtime error (permission denied, OS error)
+    3  the check could not run (permission denied, OS error)
 """
 
 from __future__ import annotations
 
-import dataclasses
-import json
-import time
 from collections.abc import Iterator
 from contextlib import contextmanager, nullcontext
-from enum import Enum, IntEnum
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import Annotated, Any
 
 import typer
-from rich.console import Console
-from rich.markup import escape
-from rich.table import Table
+from rich.text import Text
 
-if TYPE_CHECKING:
-    from optforge.portcheck.core import Listener
-
-
-class ExitCode(IntEnum):
-    OK = 0
-    NO = 1
-    ERROR = 3
-
-
-class SortKey(str, Enum):
-    port = "port"
-    pid = "pid"
-    process = "process"
-    address = "address"
-
-
-class Until(str, Enum):
-    free = "free"
-    used = "used"
-
+from optforge.core.cli import ErrorBoundary, ExitCode
+from optforge.core.console import ConsoleIO
+from optforge.core.version import get_version
+from optforge.portcheck.models import Listener, PortState, SortKey
+from optforge.portcheck.service import DEFAULT_HOST, PortService
 
 app = typer.Typer(
     name="portcheck",
-    help="Inspect listening ports, find who owns them, and test connectivity.",
-    epilog="Exit codes: 0 yes/ok | 1 no (in use, nothing found, unreachable) | 2 bad usage | 3 error",
+    help="Inspect listening ports, find their owners, and test connectivity.",
+    epilog="Exit codes: 0 yes/ok | 1 no | 2 bad usage | 3 could not run",
     no_args_is_help=True,
     rich_markup_mode="rich",
     context_settings={"help_option_names": ["-h", "--help"]},
 )
-console = Console()
-err_console = Console(stderr=True)
+console = ConsoleIO()
+_PERMISSION_HINT = "Run as Administrator (Windows) or with sudo (Linux/macOS)."
 
 PortArg = Annotated[
     int,
-    typer.Argument(
-        min=1, max=65535, metavar="PORT", show_default=False,
-        help="Port number (1-65535).",
-    ),
+    typer.Argument(min=1, max=65535, metavar="PORT", show_default=False, help="Port number (1-65535)."),
 ]
-HostOpt = Annotated[
-    str, typer.Option("--host", "-H", help="Address used for the bind test.")
-]
-QuietOpt = Annotated[
-    bool, typer.Option("--quiet", "-q", help="Print nothing; use the exit code only.")
-]
-JsonOpt = Annotated[
-    bool, typer.Option("--json", help="Print machine-readable JSON.")
-]
+HostOpt = Annotated[str, typer.Option("--host", "-H", help="Address used for bind and connect probes.")]
+QuietOpt = Annotated[bool, typer.Option("--quiet", "-q", help="Print nothing; use the exit code only.")]
+JsonOpt = Annotated[bool, typer.Option("--json", help="Print machine-readable JSON.")]
 
 
-def _core() -> Any:
-    """Import core lazily so --help and --version stay instant."""
-    from optforge.portcheck import core
-
-    return core
-
-
-@contextmanager
-def _guard() -> Iterator[None]:
-    """Turn expected core errors into a clean message and exit code 3."""
-    core = _core()
-    try:
-        yield
-    except core.PermissionDenied as exc:
-        err_console.print(f"[red]error:[/red] {escape(str(exc))}")
-        err_console.print("[dim]hint: run as Administrator (Windows) or with sudo (Linux/macOS).[/dim]")
-        raise typer.Exit(ExitCode.ERROR) from exc
-    except core.PortCheckError as exc:
-        err_console.print(f"[red]error:[/red] {escape(str(exc))}")
-        raise typer.Exit(ExitCode.ERROR) from exc
-
-
-def _emit_json(data: Any) -> None:
-    typer.echo(json.dumps(data, indent=2))
-
-
-def _scope(address: str) -> str:
-    if address in ("", "0.0.0.0", "::", "*"):
-        return "all interfaces"
-    if address == "::1" or address.startswith("127."):
-        return "local only"
-    return "specific"
-
-
-def _as_dict(row: "Listener") -> dict[str, Any]:
-    return {**dataclasses.asdict(row), "scope": _scope(row.address)}
-
-
-def _hint_hidden(rows: "list[Listener]") -> None:
-    if any(r.pid is None for r in rows):
-        err_console.print(
-            "[dim]Some process details are hidden. Run as Administrator / sudo to see them.[/dim]"
-        )
-
-
-def _listeners_table(rows: "list[Listener]", title: str | None) -> Table:
-    table = Table(title=title, title_justify="left", header_style="bold")
-    table.add_column("Port", justify="right", style="cyan", no_wrap=True)
-    table.add_column("Address", no_wrap=True)
-    table.add_column("Scope", no_wrap=True)
-    table.add_column("PID", justify="right", no_wrap=True)
-    table.add_column("Process")
-    for r in rows:
-        scope = _scope(r.address)
-        colour = {"all interfaces": "yellow", "local only": "green"}.get(scope, "")
-        table.add_row(
-            str(r.port),
-            r.address,
-            f"[{colour}]{scope}[/{colour}]" if colour else scope,
-            "-" if r.pid is None else str(r.pid),
-            escape(r.process),
-        )
-    return table
-
-
-def _owners(port: int) -> "list[Listener]":
-    return [r for r in _core().get_listeners() if r.port == port]
-
-
-def _probe(port: int, host: str) -> "tuple[bool, list[Listener]]":
-    core = _core()
-    try:
-        owners = _owners(port)
-    except core.PortCheckError:
-        owners = []
-    bindable = core.can_bind(port, host)
-    return (bool(owners) or not bindable), owners
+def _service() -> PortService:
+    """Construct the service lazily so ``--help`` and ``--version`` stay instant."""
+    return PortService()
 
 
 def _version_callback(value: bool) -> None:
     if value:
-        from importlib.metadata import version
-
-        typer.echo(f"portcheck (optforge {version('optforge')})")
+        typer.echo(f"portcheck (optforge {get_version()})")
         raise typer.Exit()
+
+
+@contextmanager
+def _guard() -> Iterator[None]:
+    with ErrorBoundary(console, permission_hint=_PERMISSION_HINT):
+        yield
+
+
+def _scope_text(scope: str) -> Text:
+    style = {"all interfaces": "yellow", "local only": "green"}.get(scope, "")
+    return Text(scope, style=style)
+
+
+def _table(rows: list[Listener], title: str | None) -> Any:
+    table = console.table(
+        title,
+        [
+            ("Port", {"justify": "right", "style": "cyan", "no_wrap": True}),
+            ("Address", {"no_wrap": True}),
+            ("Scope", {"no_wrap": True}),
+            ("PID", {"justify": "right", "no_wrap": True}),
+            ("Process", {}),
+        ],
+    )
+    for row in rows:
+        table.add_row(
+            str(row.port),
+            console.cell(row.address),
+            _scope_text(row.scope),
+            "-" if row.pid is None else str(row.pid),
+            console.cell(row.process),
+        )
+    return table
+
+
+def _hint_hidden(rows: list[Listener]) -> None:
+    if any(row.pid is None for row in rows):
+        console.hint("Some process details are hidden. Run as Administrator / sudo to see them.")
 
 
 @app.callback()
@@ -168,7 +96,10 @@ def main(
     version: Annotated[
         bool | None,
         typer.Option(
-            "--version", "-V", callback=_version_callback, is_eager=True,
+            "--version",
+            "-V",
+            callback=_version_callback,
+            is_eager=True,
             help="Show the version and exit.",
         ),
     ] = None,
@@ -187,85 +118,71 @@ def list_ports(
     ] = None,
     process: Annotated[
         str | None,
-        typer.Option(
-            "--process", "-p", metavar="TEXT",
-            help="Only rows whose process name contains TEXT (case-insensitive).",
-        ),
+        typer.Option("--process", "-p", metavar="TEXT", help="Only rows whose process name contains TEXT."),
     ] = None,
     exposed: Annotated[
-        bool,
-        typer.Option("--exposed", help="Only ports reachable from other machines."),
+        bool, typer.Option("--exposed", help="Only ports reachable from other machines.")
     ] = False,
     as_json: JsonOpt = False,
 ) -> None:
+    """List listening TCP ports."""
     with _guard():
-        rows = _core().get_listeners()
-
-    if process:
-        needle = process.lower()
-        rows = [r for r in rows if needle in r.process.lower()]
-    if exposed:
-        rows = [r for r in rows if _scope(r.address) == "all interfaces"]
-
-    keys = {
-        SortKey.port: lambda r: r.port,
-        SortKey.pid: lambda r: (r.pid is None, r.pid or 0),
-        SortKey.process: lambda r: r.process.lower(),
-        SortKey.address: lambda r: r.address,
-    }
-    rows = sorted(rows, key=keys[sort])
-    total = len(rows)
-    if limit is not None:
-        rows = rows[:limit]
+        rows = _service().query(sort=sort, limit=limit, process=process, exposed=exposed)
 
     if as_json:
-        _emit_json([_as_dict(r) for r in rows])
+        console.json([row.to_dict() for row in rows])
         return
     if not rows:
-        console.print("No listening TCP ports match.")
+        console.text("No listening TCP ports match.")
         return
 
-    console.print(_listeners_table(rows, "Listening TCP ports"))
-    if total > len(rows):
-        console.print(f"[dim]Showing {len(rows)} of {total} (change with -n).[/dim]")
+    console.print(_table(rows, "Listening TCP ports"))
     _hint_hidden(rows)
 
 
 @app.command()
 def check(
     port: PortArg,
-    host: HostOpt = "127.0.0.1",
+    host: HostOpt = DEFAULT_HOST,
     quiet: QuietOpt = False,
     as_json: JsonOpt = False,
+    expect: Annotated[
+        PortState,
+        typer.Option("--expect", case_sensitive=False, help="Exit 0 only if the port matches this state."),
+    ] = PortState.free,
 ) -> None:
+    """Check whether a port is free or in use."""
     with _guard():
-        in_use, owners = _probe(port, host)
+        result = _service().check(port, host)
 
     if as_json:
-        _emit_json({"port": port, "host": host, "in_use": in_use, "owners": [_as_dict(o) for o in owners]})
+        console.json(result.to_dict())
     elif not quiet:
-        if in_use:
-            console.print(f"[red]Port {port} is in use.[/red]")
-            if owners:
-                console.print(_listeners_table(owners, None))
-                _hint_hidden(owners)
+        if result.in_use:
+            console.success(f"Port {port} is in use.")
+            if result.owners:
+                console.print(_table(result.owners, None))
+                _hint_hidden(result.owners)
         else:
-            console.print(f"[green]Port {port} is free[/green] on {escape(host)}.")
-    raise typer.Exit(ExitCode.NO if in_use else ExitCode.OK)
+            console.success(f"Port {port} is free on {host}.")
+
+    matched = result.in_use if expect is PortState.used else not result.in_use
+    raise typer.Exit(ExitCode.OK if matched else ExitCode.NO)
 
 
 @app.command()
 def find(port: PortArg, as_json: JsonOpt = False) -> None:
+    """Show the process listening on a port."""
     with _guard():
-        owners = _owners(port)
+        owners = _service().find(port)
 
     if as_json:
-        _emit_json([_as_dict(o) for o in owners])
+        console.json([owner.to_dict() for owner in owners])
     elif owners:
-        console.print(_listeners_table(owners, f"Port {port}"))
+        console.print(_table(owners, f"Port {port}"))
         _hint_hidden(owners)
     else:
-        console.print(f"Nothing is listening on port {port}.")
+        console.text(f"Nothing is listening on port {port}.")
     raise typer.Exit(ExitCode.OK if owners else ExitCode.NO)
 
 
@@ -279,20 +196,19 @@ def connect(
     quiet: QuietOpt = False,
     as_json: JsonOpt = False,
 ) -> None:
+    """Test a TCP connection to a host and port."""
     with _guard():
-        result = _core().can_connect(host, port, timeout)
+        result = _service().connect(host, port, timeout)
 
     if as_json:
-        _emit_json({"host": host, "port": port, **dataclasses.asdict(result)})
+        console.json({"host": host, "port": port, **result.to_dict()})
     elif not quiet:
-        target = f"{escape(host)}:{port}"
+        target = f"{host}:{port}"
         if result.ok:
-            took = f" in {result.seconds * 1000:.0f} ms" if result.seconds else ""
-            console.print(f"[green]Connected to {target}[/green]{took}.")
+            took = f" in {result.seconds * 1000:.0f} ms" if result.seconds is not None else ""
+            console.success(f"Connected to {target}{took}.")
         else:
-            console.print(
-                f"[red]Could not connect to {target}[/red]: {escape(result.error or 'unknown error')}"
-            )
+            console.error(f"Could not connect to {target}: {result.error or 'unknown error'}")
     raise typer.Exit(ExitCode.OK if result.ok else ExitCode.NO)
 
 
@@ -300,42 +216,32 @@ def connect(
 def wait(
     port: PortArg,
     until: Annotated[
-        Until,
-        typer.Option(
-            "--until", "-u", case_sensitive=False,
-            help="Wait until the port is in use or free.",
-        ),
-    ] = Until.used,
+        PortState,
+        typer.Option("--until", "-u", case_sensitive=False, help="Wait until the port is in use or free."),
+    ] = PortState.used,
     timeout: Annotated[
         float, typer.Option("--timeout", "-t", min=0.1, help="Give up after N seconds.")
     ] = 30.0,
     interval: Annotated[
         float, typer.Option("--interval", "-i", min=0.05, help="Seconds between checks.")
     ] = 0.5,
-    host: HostOpt = "127.0.0.1",
+    host: HostOpt = DEFAULT_HOST,
     quiet: QuietOpt = False,
+    as_json: JsonOpt = False,
 ) -> None:
-    deadline = time.monotonic() + timeout
-    reached = False
-    spinner = nullcontext() if quiet else console.status(f"Waiting for port {port} to be {until.value}...")
+    """Wait until a port is in use or free."""
+    spinner = nullcontext() if quiet or as_json else console.status(f"Waiting for port {port} to be {until.value}...")
     with _guard(), spinner:
-        while True:
-            in_use, _ = _probe(port, host)
-            if in_use == (until is Until.used):
-                reached = True
-                break
-            if time.monotonic() >= deadline:
-                break
-            time.sleep(interval)
+        result = _service().wait(port, until, timeout=timeout, interval=interval, host=host)
 
-    if not quiet:
-        if reached:
-            console.print(f"[green]Port {port} is {until.value}.[/green]")
+    if as_json:
+        console.json(result.to_dict())
+    elif not quiet:
+        if result.reached:
+            console.success(f"Port {port} is {until.value}.")
         else:
-            console.print(
-                f"[red]Timed out after {timeout:g}s waiting for port {port} to be {until.value}.[/red]"
-            )
-    raise typer.Exit(ExitCode.OK if reached else ExitCode.NO)
+            console.error(f"Timed out after {timeout:g}s waiting for port {port} to be {until.value}.")
+    raise typer.Exit(ExitCode.OK if result.reached else ExitCode.NO)
 
 
 if __name__ == "__main__":

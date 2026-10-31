@@ -1,31 +1,17 @@
-"""OptForge package entry points."""
+"""OptForge: cross-platform developer utilities with a stable, scriptable CLI."""
 
 from __future__ import annotations
 
-from importlib.metadata import PackageNotFoundError, version
+from optforge.core.version import get_version
 
-try:
-    __version__ = version("optforge")
-except PackageNotFoundError:
-    __version__ = "0.1.0"
+__version__ = get_version()
 
 
 def main() -> None:
-    """Simple top-level entry point for the package."""
-    import typer
-
-    app = typer.Typer(
-        help="OptForge developer utilities",
-        no_args_is_help=True,
-        add_completion=False,
-    )
-
-    @app.command("list")
-    def list_commands() -> None:
-        typer.echo("Available commands:")
-        typer.echo("  diskcheck")
-        typer.echo("  envcheck")
-        typer.echo("  portcheck")
-        typer.echo("  pycacheClean")
+    """Entry point for the ``optforge`` dispatcher."""
+    from optforge.cli import app
 
     app()
+
+
+__all__ = ["__version__", "main"]

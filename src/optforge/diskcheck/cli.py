@@ -62,13 +62,22 @@ def _table(infos: list[DiskInfo], warn_at: float | None) -> None:
 def main(
     path: Annotated[str, typer.Argument(help="Directory or drive to inspect.")] = ".",
     all_volumes: Annotated[
-        bool, typer.Option("--all", "-a", help="Show every mounted volume instead of one path.")
+        bool,
+        typer.Option("--all", "-a", help="Show every mounted volume instead of one path."),
     ] = False,
     warn_at: Annotated[
         float | None,
-        typer.Option("--warn-at", min=0.0, max=100.0, help="Exit 1 when used percent reaches this value."),
+        typer.Option(
+            "--warn-at",
+            min=0.0,
+            max=100.0,
+            help="Exit 1 when used percent reaches this value.",
+        ),
     ] = None,
-    as_json: Annotated[bool, typer.Option("--json", help="Print machine-readable JSON.")] = False,
+    as_json: Annotated[
+        bool,
+        typer.Option("--json", help="Print machine-readable JSON."),
+    ] = False,
     version: Annotated[
         bool | None,
         typer.Option(
@@ -93,7 +102,9 @@ def main(
     over_threshold = warn_at is not None and any(info.percent_used >= warn_at for info in infos)
     if over_threshold:
         if not as_json:
-            console.warning(f"Storage pressure: at least one volume is at or above {warn_at:g}% used.")
+            console.warning(
+                f"Storage pressure: at least one volume is at or above {warn_at:g}% used."
+            )
         raise typer.Exit(ExitCode.NO)
     raise typer.Exit(ExitCode.OK)
 

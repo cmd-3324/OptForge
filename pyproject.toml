@@ -43,6 +43,7 @@ envcheck = "optforge.envcheck.cli:app"
 diskcheck = "optforge.diskcheck.cli:app"
 pycache-clean = "optforge.pycacheclean.cli:app"
 pycacheClean = "optforge.pycacheclean.cli:app"
+killNotif = "optforge.killNotif.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/cmd-3324/OptForge"

@@ -1,6 +1,6 @@
 # OptForge
 
-Small cross-platform developer CLI tools for inspecting listening ports, checking environment variables, monitoring disk usage, and cleaning Python cache artifacts.
+Small developer CLI tools for inspecting listening ports, checking environment variables, monitoring disk usage, cleaning Python cache artifacts, and clearing Windows toast notifications. Most tools are cross-platform; `killNotif` is Windows-only.
 
 Built with Python, Typer, and Rich.
 
@@ -16,12 +16,13 @@ It helps you:
 - review environment variables and runtime context
 - monitor disk space and storage pressure
 - remove stale Python cache artifacts from local projects, without scanning `venv` or `.venv`
+- clear Windows toast notifications, optionally for a single app (Windows 10/11 only)
 
 ## Why use OptForge?
 
 Whether you're starting a local service, troubleshooting an app crash, checking for port collisions, or cleaning up a messy Python workspace, OptForge gives you quick terminal-based tools without opening a full IDE or browser.
 
-It is designed to be simple, fast, and cross-platform.
+Most tools are designed to be simple, fast, and cross-platform; `killNotif` is Windows-only.
 
 ## Features
 
@@ -50,6 +51,14 @@ It is designed to be simple, fast, and cross-platform.
 - remove `__pycache__` directories and stale Python bytecode files
 - skip virtual environments (`venv` and `.venv`) instead of scanning them
 - help keep workspaces clean without walking dependency trees
+
+### Windows notification cleanup (Windows only)
+
+- clear all toast notifications from the Windows Action Center
+- clear notifications from a single app by AUMID
+- emit JSON or stay quiet for scripting
+- requires Windows 10/11 and Windows PowerShell 5.1+
+- not available on macOS or Linux; the command exits with code `3` there
 
 ## Installation
 
@@ -94,8 +103,18 @@ After installation, the package exposes the following commands:
 portcheck --help
 envcheck --help
 diskcheck --help
-pycacheClean --help
+pycache-clean --help
+killNotif --help   # Windows 10/11 only
 ```
+
+## Platform support
+
+| Tool | Windows | macOS | Linux |
+| --- | --- | --- | --- |
+| `portcheck`, `envcheck`, `diskcheck`, `pycache-clean` | Yes | Yes | Yes |
+| `killNotif` | Windows 10/11 only | No | No |
+
+`killNotif` relies on the Windows Runtime toast notification APIs and Windows PowerShell 5.1, so it cannot run on macOS or Linux. The CLI reports a clear error and exits with code `3` instead of failing with a traceback.
 
 ## Usage examples
 
@@ -124,13 +143,26 @@ diskcheck
 
 ### Clean Python cache files
 
-`pycacheClean` searches a project for `__pycache__` directories and deletes them. Folders named `venv` or `.venv` are ignored so virtualenv bytecode is left alone and the scan stays fast.
+`pycache-clean` searches a project for `__pycache__` directories and deletes them. Folders named `venv` or `.venv` are ignored so virtualenv bytecode is left alone and the scan stays fast. The legacy `pycacheClean` alias is also installed.
 
 ```bash
-pycacheClean --dry-run
-pycacheClean --recursive
-pycacheClean --max-depth 2
+pycache-clean --dry-run
+pycache-clean --recursive
+pycache-clean --max-depth 2
 ```
+
+### Clear Windows notifications
+
+`killNotif` clears toast notifications from the Windows Action Center. It requires Windows 10/11 and Windows PowerShell 5.1+; it does not work on macOS or Linux.
+
+```powershell
+killNotif
+killNotif --aumid "Microsoft.WindowsStore_8wekyb3d8bbwe!App"
+killNotif --json
+killNotif --quiet
+```
+
+Use `--aumid` to target one sender. `--json` prints `{"aumid": ..., "cleared": ...}`, and `--quiet` suppresses output. The command exits `0` on success, including when there was nothing to clear, and `3` when it cannot run.
 
 ## Project structure
 
@@ -138,10 +170,12 @@ pycacheClean --max-depth 2
 OptForge/
 ├── src/
 │   └── optforge/
+│       ├── core/
 │       ├── diskcheck/
 │       ├── envcheck/
+│       ├── killNotif/
 │       ├── portcheck/
-│       └── pycacheClean/
+│       └── pycacheclean/
 ├── Makefile
 ├── README.md
 ├── pyproject.toml
@@ -169,6 +203,9 @@ make test
 - Typer
 - Rich
 - psutil
+- Windows 10/11 and Windows PowerShell 5.1+ for `killNotif`
+
+All other commands work on Windows, macOS, and Linux.
 
 ## Contributing
 
@@ -182,8 +219,8 @@ Contributions are welcome.
 
 ## License
 
-This project does not currently declare a license in the repository metadata. If you plan to distribute or publish it more broadly, consider adding an open-source license such as MIT or Apache 2.0.
+MIT. See [LICENSE](LICENSE).
 
 ## Summary
 
-OptForge is a practical toolkit for developers working on local environments, especially when they need fast answers about ports, runtime configuration, storage health, and Python project clutter.
+OptForge is a practical toolkit for developers working on local environments, especially when they need fast answers about ports, runtime configuration, storage health, Python project clutter, and Windows notification noise.

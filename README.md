@@ -94,6 +94,11 @@ git clone https://github.com/cmd-3324/OptForge.git
 cd OptForge
 python -m pip install .
 ```
+### From PyPi
+
+```bash
+pip install optforge
+```
 
 ### Download the latest Windows executable
 

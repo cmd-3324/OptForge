@@ -11,10 +11,11 @@ from optforge.diskcheck.cli import app as diskcheck_app
 from optforge.envcheck.cli import app as envcheck_app
 from optforge.portcheck.cli import app as portcheck_app
 from optforge.pycacheclean.cli import app as pycacheclean_app
+from optforge.volume.cli import app as volume_app
 
 app = typer.Typer(
     name="optforge",
-    help="Developer utilities for ports, environment variables, disk usage, and Python caches.",
+    help="Developer utilities for ports, environment variables, disk usage, Python caches, and volume.",
     no_args_is_help=True,
     rich_markup_mode="rich",
     context_settings={"help_option_names": ["-h", "--help"]},
@@ -48,6 +49,7 @@ app.add_typer(envcheck_app, name="envcheck")
 app.add_typer(diskcheck_app, name="diskcheck")
 app.add_typer(pycacheclean_app, name="pycache-clean")
 app.add_typer(pycacheclean_app, name="pycacheClean", hidden=True)
+app.add_typer(volume_app, name="vol")
 
 
 if __name__ == "__main__":

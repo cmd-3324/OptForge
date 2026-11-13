@@ -1,6 +1,6 @@
 # OptForge
 
-Small developer CLI tools for inspecting listening ports, checking environment variables, monitoring disk usage, cleaning Python cache artifacts, and clearing Windows toast notifications. Most tools are cross-platform; `killNotif` is Windows-only.
+Small developer CLI tools for inspecting listening ports, checking environment variables, monitoring disk usage, cleaning Python cache artifacts, controlling output volume, and clearing Windows toast notifications. Most tools are cross-platform; `killNotif` is Windows-only.
 
 Built with Python, Typer, and Rich.
 
@@ -16,6 +16,7 @@ It helps you:
 - review environment variables and runtime context
 - monitor disk space and storage pressure
 - remove stale Python cache artifacts from local projects, without scanning `venv` or `.venv`
+- get, set, mute, and adjust the default output volume
 - clear Windows toast notifications, optionally for a single app (Windows 10/11 only)
 
 ## Why use OptForge?
@@ -45,6 +46,15 @@ Most tools are designed to be simple, fast, and cross-platform; `killNotif` is W
 - inspect filesystem usage and storage conditions
 - identify when available disk space is running low
 - support local development diagnostics
+
+### Volume control
+
+- read and set the default output volume
+- increase or decrease the volume by a custom step
+- set 100% or 0% instantly
+- mute, unmute, or toggle mute
+- emit JSON or stay quiet for scripting
+- works on Windows, macOS, and Linux
 
 ### Python cache cleanup
 
@@ -104,6 +114,7 @@ portcheck --help
 envcheck --help
 diskcheck --help
 pycache-clean --help
+vol --help
 killNotif --help   # Windows 10/11 only
 ```
 
@@ -112,7 +123,10 @@ killNotif --help   # Windows 10/11 only
 | Tool | Windows | macOS | Linux |
 | --- | --- | --- | --- |
 | `portcheck`, `envcheck`, `diskcheck`, `pycache-clean` | Yes | Yes | Yes |
+| `vol` | Yes | Yes | Yes |
 | `killNotif` | Windows 10/11 only | No | No |
+
+`vol` uses the system mixer: Core Audio on Windows, `osascript` on macOS, and `pactl`/`wpctl`/`amixer` on Linux.
 
 `killNotif` relies on the Windows Runtime toast notification APIs and Windows PowerShell 5.1, so it cannot run on macOS or Linux. The CLI reports a clear error and exits with code `3` instead of failing with a traceback.
 
@@ -139,6 +153,31 @@ envcheck
 
 ```bash
 diskcheck
+```
+
+### Control output volume
+
+```bash
+vol get
+vol status
+vol on 50
+vol up 10
+vol down 10
+vol full
+vol none
+vol mute
+vol unmute
+vol toggle
+```
+
+`vol on <PERCENT>` sets an absolute level, while `vol up` and `vol down` change it relative to the current level (default step: `5`). Setting a level above `0` also unmutes the output.
+
+Use `--json` for machine-readable output and `--quiet` to suppress output:
+
+```bash
+vol get --json
+vol on 35 --json
+vol toggle --json
 ```
 
 ### Clean Python cache files
@@ -175,7 +214,8 @@ OptForge/
 │       ├── envcheck/
 │       ├── killNotif/
 │       ├── portcheck/
-│       └── pycacheclean/
+│       ├── pycacheclean/
+│       └── volume/
 ├── Makefile
 ├── README.md
 ├── pyproject.toml
@@ -203,6 +243,8 @@ make test
 - Typer
 - Rich
 - psutil
+- pycaw for `vol` on Windows (installed automatically)
+- `pactl`, `wpctl`, or `amixer` for `vol` on Linux
 - Windows 10/11 and Windows PowerShell 5.1+ for `killNotif`
 
 All other commands work on Windows, macOS, and Linux.
@@ -223,4 +265,4 @@ MIT. See [LICENSE](LICENSE).
 
 ## Summary
 
-OptForge is a practical toolkit for developers working on local environments, especially when they need fast answers about ports, runtime configuration, storage health, Python project clutter, and Windows notification noise.
+OptForge is a practical toolkit for developers working on local environments, especially when they need fast answers about ports, runtime configuration, storage health, output volume, Python project clutter, and Windows notification noise.

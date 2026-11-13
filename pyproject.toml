@@ -82,6 +82,10 @@ ignore = ["B008"]
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101"]
 
+[project.urls]
+Homepage = "https://github.com/cmd-3324/OptForge"
+
+
 [tool.mypy]
 python_version = "3.13"
 files = ["src"]

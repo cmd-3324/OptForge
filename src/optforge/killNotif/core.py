@@ -19,7 +19,7 @@ def clear_notifications(aumid: str | None = None) -> int:
         "-NoProfile",
         "-NonInteractive",
         "-ExecutionPolicy",
-        "Bypass",
+        "RemoteSigned",
         "-File",
         str(JOB),
     ]

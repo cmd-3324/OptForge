@@ -19,9 +19,9 @@
 #       - uses: pypa/gh-action-pypi-publish@release/v1
 name: publish
 on:
+  workflow_dispatch:
   release:
     types: [published]
-  workflow_dispatch:
 
 jobs:
   publish:
@@ -32,6 +32,10 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+
+      - name: Version from tag
+        run: sed -i "s/^version = .*/version = \"${GITHUB_REF_NAME#v}\"/" pyproject.toml
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"

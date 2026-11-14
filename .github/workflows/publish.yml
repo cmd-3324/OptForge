@@ -3,15 +3,27 @@ name: publish
 "on":
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish (for example v0.3.0)"
+        required: true
+        type: string
 
 permissions:
   contents: read
+
+concurrency:
+  group: publish-${{ github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.14.7"
@@ -27,6 +39,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.14.7"
@@ -35,10 +49,10 @@ jobs:
       - name: Verify tag matches package version
         run: |
           uv run python -c "
-          import os, pathlib, re
+          import pathlib, re
           text = pathlib.Path('src/optforge/_version.py').read_text(encoding='utf-8')
           version = re.search(r'__version__ = \"([^\"]+)\"', text).group(1)
-          tag = os.environ['GITHUB_REF_NAME'].removeprefix('v')
+          tag = '${{ inputs.tag || github.ref_name }}'.removeprefix('v')
           assert tag == version, f'tag {tag} != version {version}'
           "
       - run: uv build

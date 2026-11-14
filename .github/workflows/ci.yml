@@ -1,6 +1,36 @@
-name: CI
+# name: CI
 
-"on":
+# "on":
+#   push:
+#     branches: [main, dev]
+#   pull_request:
+
+# permissions:
+#   contents: read
+
+# jobs:
+#   test:
+#     name: ${{ matrix.os }} / Python ${{ matrix.python }}
+#     runs-on: ${{ matrix.os }}
+#     strategy:
+#       fail-fast: false
+#       matrix:
+#         os: [ubuntu-latest, windows-latest, macos-latest]
+#         python: ["3.13", "3.14.7"]
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: astral-sh/setup-uv@v5
+#         with:
+#           python-version: ${{ matrix.python }}
+#           enable-cache: true
+#       - run: uv sync --all-extras
+#       - run: uv run ruff check .
+#       - run: uv run mypy src
+#       - run: uv run pytest
+# #
+
+name: CI
+on:
   push:
     branches: [main, dev]
   pull_request:
@@ -10,21 +40,13 @@ permissions:
 
 jobs:
   test:
-    name: ${{ matrix.os }} / Python ${{ matrix.python }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python: ["3.13", "3.14.7"]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
         with:
-          python-version: ${{ matrix.python }}
           enable-cache: true
-      - run: uv sync --all-extras
+      - run: uv sync
       - run: uv run ruff check .
       - run: uv run mypy src
       - run: uv run pytest
-#

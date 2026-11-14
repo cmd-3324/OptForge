@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from optforge.core.redaction import SecretRedactor
 from optforge.envcheck.models import EnvEntry
 
-_QUOTE_TRIGGERS = frozenset(' \t\n#"\'')
+_QUOTE_TRIGGERS = frozenset(" \t\n#\"'")
 
 
 class EnvironmentService:
@@ -43,9 +43,7 @@ class EnvironmentService:
             redacted = False
             if redact and sensitive:
                 value, redacted = self._redactor.redact(key, raw)
-            entries.append(
-                EnvEntry(key=key, value=value, sensitive=sensitive, redacted=redacted)
-            )
+            entries.append(EnvEntry(key=key, value=value, sensitive=sensitive, redacted=redacted))
         return entries
 
     @staticmethod
@@ -57,10 +55,5 @@ class EnvironmentService:
 def _dotenv_line(entry: EnvEntry) -> str:
     if not entry.value or not (set(entry.value) & _QUOTE_TRIGGERS):
         return f"{entry.key}={entry.value}"
-    escaped = (
-        entry.value.replace("\\", "\\\\")
-        .replace('"', '\\"')
-        .replace("\n", "\\n")
-        .replace("\t", "\\t")
-    )
+    escaped = entry.value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\t", "\\t")
     return f'{entry.key}="{escaped}"'

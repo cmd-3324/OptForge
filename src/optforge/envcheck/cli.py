@@ -18,7 +18,7 @@ app = typer.Typer(
     help="Inspect environment variables and runtime configuration. Secrets are redacted by default.",
     no_args_is_help=False,
     rich_markup_mode="rich",
-    context_settings={"help_option_names": ["-h", "--help"]},
+    context_settings={"help_option_names": ["-h", "--help"], "allow_interspersed_args": True},
 )
 console = ConsoleIO()
 
@@ -67,9 +67,7 @@ def main(
         OutputFormat,
         typer.Option("--format", "-f", case_sensitive=False, help="Output format."),
     ] = OutputFormat.table,
-    as_json: Annotated[
-        bool, typer.Option("--json", help="Alias for --format json.")
-    ] = False,
+    as_json: Annotated[bool, typer.Option("--json", help="Alias for --format json.")] = False,
     version: Annotated[
         bool | None,
         typer.Option(

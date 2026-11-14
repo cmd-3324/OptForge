@@ -29,7 +29,7 @@ class ProcessNameResolver:
             return cached
         try:
             resolved = self._factory(pid).name()
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+        except psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess:
             resolved = _UNKNOWN
         self._cache[pid] = resolved
         return resolved

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from enum import IntEnum
 from types import TracebackType
-from typing import Self
+from typing import Literal, Self
 
 import typer
 
@@ -42,7 +42,7 @@ class ErrorBoundary:
         exc_type: type[BaseException] | None,
         exc: BaseException | None,
         traceback: TracebackType | None,
-    ) -> bool:
+    ) -> Literal[False]:
         if exc is None:
             return False
         if isinstance(exc, PermissionDenied):

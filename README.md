@@ -72,55 +72,43 @@ Most tools are designed to be simple, fast, and cross-platform; `killNotif` is W
 
 ## Installation
 
-### Install with pipx
+Python 3.14.7 or newer is required.
+
+### Install from PyPI with pipx
 
 The recommended installation method is pipx:
 
 ```bash
-pipx install git+https://github.com/cmd-3324/OptForge.git
+pipx install optforge
 ```
 
-If you are working from a local clone:
+### Install from PyPI with pip
 
 ```bash
-cd OptForge
-pipx install --editable .
+python -m pip install optforge
 ```
 
-### Install with pip
+### Install from a local clone
 
 ```bash
 git clone https://github.com/cmd-3324/OptForge.git
 cd OptForge
-python -m pip install .
+pipx install --editable .
 ```
-### From PyPi
-
-```bash
-pip install optforge
-```
-
-### Download the latest Windows executable
-
-You can download the latest Windows `.exe` release directly from GitHub Releases:
-
-```text
-https://github.com/cmd-3324/OptForge/releases/latest
-```
-
-This is useful if you want to run OptForge without installing Python dependencies manually.
 
 ## Quick start
 
 After installation, the package exposes the following commands:
 
 ```bash
+optforge --help
 portcheck --help
 envcheck --help
 diskcheck --help
 pycache-clean --help
 vol --help
 killNotif --help   # Windows 10/11 only
+optforge killNotif --help
 ```
 
 ## Platform support
@@ -244,7 +232,7 @@ make test
 
 ## Requirements
 
-- Python 3.13+
+- Python 3.14.7+
 - Typer
 - Rich
 - psutil

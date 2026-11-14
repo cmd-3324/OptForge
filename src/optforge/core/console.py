@@ -38,16 +38,18 @@ class ConsoleIO:
         self.out.print(Text(str(value)))
 
     def success(self, message: str) -> None:
-        self.out.print(f"[green]{message}[/green]")
+        self.out.print(Text(message, style="green"))
 
     def warning(self, message: str) -> None:
-        self.err.print(f"[yellow]{message}[/yellow]")
+        self.err.print(Text(message, style="yellow"))
 
     def error(self, message: str) -> None:
-        self.err.print(f"[red]error:[/red] {message}")
+        line = Text("error: ", style="bold red")
+        line.append(str(message))
+        self.err.print(line)
 
     def hint(self, message: str) -> None:
-        self.err.print(f"[dim]{message}[/dim]")
+        self.err.print(Text(message, style="dim"))
 
     def json(self, data: Any) -> None:
         """Emit exact, machine-parseable JSON on stdout."""

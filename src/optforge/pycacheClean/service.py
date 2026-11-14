@@ -73,7 +73,5 @@ class CacheService:
         if not path.is_dir():
             raise InvalidInput(f"Not a directory: {path}")
         if not allow_root and path.resolve() == Path(path.anchor):
-            raise InvalidInput(
-                f"Refusing to scan the filesystem root {path}. Pass --allow-root if you mean it."
-            )
+            raise InvalidInput(f"Refusing to scan the filesystem root {path}. Pass --allow-root if you mean it.")
         return path

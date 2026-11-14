@@ -3,18 +3,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class PortState(str, Enum):
+class PortState(StrEnum):
     """The two states a waiter can wait for."""
 
     free = "free"
     used = "used"
 
 
-class SortKey(str, Enum):
+class SortKey(StrEnum):
     """Columns accepted by ``portcheck list --sort``."""
 
     port = "port"

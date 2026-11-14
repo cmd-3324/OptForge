@@ -19,7 +19,7 @@ app = typer.Typer(
     help="Remove Python __pycache__ directories. Skips virtualenvs by default.",
     no_args_is_help=False,
     rich_markup_mode="rich",
-    context_settings={"help_option_names": ["-h", "--help"]},
+    context_settings={"help_option_names": ["-h", "--help"], "allow_interspersed_args": True},
 )
 console = ConsoleIO()
 
@@ -52,18 +52,10 @@ def main(
         bool,
         typer.Option("--skip-venv/--include-venv", help="Skip (or include) venv and .venv trees."),
     ] = True,
-    measure: Annotated[
-        bool, typer.Option("--size/--no-size", help="Measure files and bytes per target.")
-    ] = True,
-    dry_run: Annotated[
-        bool, typer.Option("--dry-run", help="List what would be removed without deleting it.")
-    ] = False,
-    yes: Annotated[
-        bool, typer.Option("--yes", "-y", help="Delete without asking for confirmation.")
-    ] = False,
-    allow_root: Annotated[
-        bool, typer.Option("--allow-root", help="Permit scanning the filesystem root.")
-    ] = False,
+    measure: Annotated[bool, typer.Option("--size/--no-size", help="Measure files and bytes per target.")] = True,
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="List what would be removed without deleting it.")] = False,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Delete without asking for confirmation.")] = False,
+    allow_root: Annotated[bool, typer.Option("--allow-root", help="Permit scanning the filesystem root.")] = False,
     as_json: Annotated[bool, typer.Option("--json", help="Print machine-readable JSON.")] = False,
     version: Annotated[
         bool | None,

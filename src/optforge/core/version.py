@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 
-FALLBACK_VERSION = "0.2.0"
+from optforge._version import __version__
 
 
 def get_version(distribution: str = "optforge") -> str:
-    """Return the installed distribution version, or the source-tree fallback."""
+    """Return the installed distribution version, or the source-tree version."""
     try:
         return version(distribution)
     except PackageNotFoundError:
-        return FALLBACK_VERSION
+        return __version__

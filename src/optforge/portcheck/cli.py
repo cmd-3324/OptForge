@@ -113,16 +113,12 @@ def list_ports(
         SortKey,
         typer.Option("--sort", "-s", case_sensitive=False, help="Column to sort by."),
     ] = SortKey.port,
-    limit: Annotated[
-        int | None, typer.Option("--limit", "-n", min=1, help="Show at most N rows.")
-    ] = None,
+    limit: Annotated[int | None, typer.Option("--limit", "-n", min=1, help="Show at most N rows.")] = None,
     process: Annotated[
         str | None,
         typer.Option("--process", "-p", metavar="TEXT", help="Only rows whose process name contains TEXT."),
     ] = None,
-    exposed: Annotated[
-        bool, typer.Option("--exposed", help="Only ports reachable from other machines.")
-    ] = False,
+    exposed: Annotated[bool, typer.Option("--exposed", help="Only ports reachable from other machines.")] = False,
     as_json: JsonOpt = False,
 ) -> None:
     """List listening TCP ports."""
@@ -190,9 +186,7 @@ def find(port: PortArg, as_json: JsonOpt = False) -> None:
 def connect(
     host: Annotated[str, typer.Argument(metavar="HOST", help="Hostname or IP address.")],
     port: PortArg,
-    timeout: Annotated[
-        float, typer.Option("--timeout", "-t", min=0.1, help="Seconds to wait.")
-    ] = 3.0,
+    timeout: Annotated[float, typer.Option("--timeout", "-t", min=0.1, help="Seconds to wait.")] = 3.0,
     quiet: QuietOpt = False,
     as_json: JsonOpt = False,
 ) -> None:
@@ -219,12 +213,8 @@ def wait(
         PortState,
         typer.Option("--until", "-u", case_sensitive=False, help="Wait until the port is in use or free."),
     ] = PortState.used,
-    timeout: Annotated[
-        float, typer.Option("--timeout", "-t", min=0.1, help="Give up after N seconds.")
-    ] = 30.0,
-    interval: Annotated[
-        float, typer.Option("--interval", "-i", min=0.05, help="Seconds between checks.")
-    ] = 0.5,
+    timeout: Annotated[float, typer.Option("--timeout", "-t", min=0.1, help="Give up after N seconds.")] = 30.0,
+    interval: Annotated[float, typer.Option("--interval", "-i", min=0.05, help="Seconds between checks.")] = 0.5,
     host: HostOpt = DEFAULT_HOST,
     quiet: QuietOpt = False,
     as_json: JsonOpt = False,

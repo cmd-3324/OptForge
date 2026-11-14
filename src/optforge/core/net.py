@@ -9,8 +9,7 @@ each returned endpoint with the remaining time.
 from __future__ import annotations
 
 import socket
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import TimeoutError as FuturesTimeoutError
+import threading
 from dataclasses import dataclass
 from typing import Any
 
@@ -74,14 +73,25 @@ def resolve_endpoints(host: str, port: int, *, passive: bool = False) -> list[En
 
 
 def resolve_endpoints_with_timeout(host: str, port: int, timeout: float) -> list[Endpoint]:
-    """Resolve ``host`` while enforcing ``timeout`` on the DNS lookup."""
-    executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="optforge-dns")
-    future = executor.submit(resolve_endpoints, host, port)
-    try:
-        return future.result(timeout=timeout)
-    except FuturesTimeoutError as exc:
-        raise OperationFailed(
-            f"Timed out after {timeout:g}s while resolving {host!r}."
-        ) from exc
-    finally:
-        executor.shutdown(wait=False, cancel_futures=True)
+    """Resolve ``host`` while enforcing ``timeout`` on the DNS lookup.
+
+    The lookup runs in a daemon thread so a resolver that ignores its own
+    deadline cannot block interpreter shutdown.
+    """
+    endpoints: list[Endpoint] = []
+    failures: list[BaseException] = []
+
+    def worker() -> None:
+        try:
+            endpoints.extend(resolve_endpoints(host, port))
+        except BaseException as exc:
+            failures.append(exc)
+
+    thread = threading.Thread(target=worker, name="optforge-dns", daemon=True)
+    thread.start()
+    thread.join(timeout)
+    if thread.is_alive():
+        raise OperationFailed(f"Timed out after {timeout:g}s while resolving {host!r}.")
+    if failures:
+        raise failures[0]
+    return endpoints

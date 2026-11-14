@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
 from optforge.portcheck.binder import PortBinder
 from optforge.portcheck.connector import Connector
 from optforge.portcheck.models import (
@@ -99,8 +102,8 @@ class PortService:
         return PortWaiter(port, state.value, probe).wait(timeout, interval)
 
 
-def _sort_key(sort: SortKey) -> object:
-    keys = {
+def _sort_key(sort: SortKey) -> Callable[[Listener], Any]:
+    keys: dict[SortKey, Callable[[Listener], Any]] = {
         SortKey.port: lambda row: (row.port, row.address),
         SortKey.pid: lambda row: (row.pid is None, row.pid or 0, row.port),
         SortKey.process: lambda row: (row.process.lower(), row.port),

@@ -35,9 +35,7 @@ class ListenerScanner:
         try:
             connections = list(self._provider(kind="tcp"))
         except psutil.AccessDenied as exc:
-            raise PermissionDenied(
-                "The operating system denied access to the socket table."
-            ) from exc
+            raise PermissionDenied("The operating system denied access to the socket table.") from exc
         except OSError as exc:
             raise PermissionDenied(f"Could not read the socket table: {exc}") from exc
 

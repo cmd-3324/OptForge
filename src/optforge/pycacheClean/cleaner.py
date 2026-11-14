@@ -27,7 +27,12 @@ class CacheCleaner:
                 continue
             errors: list[str] = []
 
-            def on_error(_func: Any, path: str, exc: BaseException) -> None:
+            def on_error(
+                _func: Any,
+                path: str,
+                exc: BaseException,
+                errors: list[str] = errors,
+            ) -> None:
                 errors.append(f"{path}: {exc}")
 
             try:

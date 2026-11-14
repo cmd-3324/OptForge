@@ -38,9 +38,7 @@ AumidOpt = Annotated[
         help="Only clear notifications from this AppUserModelID.",
     ),
 ]
-QuietOpt = Annotated[
-    bool, typer.Option("--quiet", "-q", help="Print nothing; use the exit code only.")
-]
+QuietOpt = Annotated[bool, typer.Option("--quiet", "-q", help="Print nothing; use the exit code only.")]
 JsonOpt = Annotated[bool, typer.Option("--json", help="Print machine-readable JSON.")]
 
 
@@ -71,7 +69,7 @@ def _run(aumid: str | None) -> int:
         raise OperationFailed(f"unexpected helper output: {exc}") from exc
 
 
-@app.command()
+@app.callback(invoke_without_command=True)
 def main(
     aumid: AumidOpt = None,
     json_output: JsonOpt = False,

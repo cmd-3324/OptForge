@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from optforge.core.version import get_version
-
-__version__ = get_version()
+from optforge._version import __version__
 
 
 def main() -> None:

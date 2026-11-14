@@ -19,7 +19,7 @@ app = typer.Typer(
     help="Inspect disk usage and warn when storage pressure crosses a threshold.",
     no_args_is_help=False,
     rich_markup_mode="rich",
-    context_settings={"help_option_names": ["-h", "--help"]},
+    context_settings={"help_option_names": ["-h", "--help"], "allow_interspersed_args": True},
 )
 console = ConsoleIO()
 
@@ -102,9 +102,7 @@ def main(
     over_threshold = warn_at is not None and any(info.percent_used >= warn_at for info in infos)
     if over_threshold:
         if not as_json:
-            console.warning(
-                f"Storage pressure: at least one volume is at or above {warn_at:g}% used."
-            )
+            console.warning(f"Storage pressure: at least one volume is at or above {warn_at:g}% used.")
         raise typer.Exit(ExitCode.NO)
     raise typer.Exit(ExitCode.OK)
 

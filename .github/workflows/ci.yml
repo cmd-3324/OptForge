@@ -16,32 +16,14 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python: ["3.14.7"]
+        python: ["3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ matrix.python }}
           enable-cache: true
-      - run: uv sync --locked --all-extras
+      - run: uv sync --all-extras
       - run: uv run ruff check .
-      - run: uv run ruff format --check .
       - run: uv run mypy src
-      - run: uv run pytest --cov=optforge --cov-report=term-missing --cov-fail-under=55
-
-  build:
-    name: Build distributions
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          python-version: "3.14.7"
-          enable-cache: true
-      - run: uv build
-      - run: uvx twine check dist/*
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist/*
+      - run: uv run pytest

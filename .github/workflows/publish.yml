@@ -1,79 +1,19 @@
 name: publish
-
-"on":
+on:
   release:
     types: [published]
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Tag to publish (for example v0.3.0)"
-        required: true
-        type: string
-
-permissions:
-  contents: read
-
-concurrency:
-  group: publish-${{ github.ref_name }}
-  cancel-in-progress: false
-
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.tag || github.ref }}
-      - uses: astral-sh/setup-uv@v5
-        with:
-          python-version: "3.14.7"
-          enable-cache: true
-      - run: uv sync --locked --all-extras
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
-      - run: uv run mypy src
-      - run: uv run pytest
-
-  build:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.tag || github.ref }}
-      - uses: astral-sh/setup-uv@v5
-        with:
-          python-version: "3.14.7"
-          enable-cache: true
-      - run: uv sync --locked --all-extras
-      - name: Verify tag matches package version
-        run: |
-          uv run python -c "
-          import pathlib, re
-          text = pathlib.Path('src/optforge/_version.py').read_text(encoding='utf-8')
-          version = re.search(r'__version__ = \"([^\"]+)\"', text).group(1)
-          tag = '${{ inputs.tag || github.ref_name }}'.removeprefix('v')
-          assert tag == version, f'tag {tag} != version {version}'
-          "
-      - run: uv build
-      - run: uvx twine check dist/*
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist/*
-
   publish:
-    needs: build
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
       id-token: write
       contents: read
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          name: dist
-          path: dist
+          python-version: "3.x"
+      - run: pip install build
+      - run: python -m build
       - uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: dist

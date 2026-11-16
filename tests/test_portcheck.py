@@ -3,6 +3,11 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
+import pytest
+
+from optforge.core.errors import OperationFailed
+from optforge.portcheck import binder as binder_module
+from optforge.portcheck.binder import PortBinder
 from optforge.portcheck.models import Listener, PortState, SortKey, scope_for
 from optforge.portcheck.service import PortService
 from optforge.portcheck.waiter import PortWaiter
@@ -74,3 +79,21 @@ def test_models_serialize() -> None:
     assert payload["scope"] == "all interfaces"
     assert payload["pid"] == 1
     assert PortState.used.value == "used"
+
+
+def test_binder_rejects_unresolvable_explicit_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    def broken(*_args: object, **_kwargs: object) -> list[object]:
+        raise OperationFailed("Could not resolve 'nope.invalid'")
+
+    monkeypatch.setattr(binder_module, "resolve_endpoints", broken)
+    with pytest.raises(OperationFailed):
+        PortBinder().is_free(8000, "nope.invalid")
+
+
+def test_binder_treats_missing_address_family_as_free(monkeypatch: pytest.MonkeyPatch) -> None:
+    def broken(*_args: object, **_kwargs: object) -> list[object]:
+        raise OperationFailed("no IPv6 address")
+
+    monkeypatch.setattr(binder_module, "resolve_endpoints", broken)
+    assert PortBinder().is_free(8000, "::") is True
+    assert PortBinder().is_free_on_all_interfaces(8000) is True

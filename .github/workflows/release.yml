@@ -1,43 +1,16 @@
-# name: release
-# on:
-#   push:
-#     branches: [ dev ]
-
-# jobs:
-#   release:
-#     runs-on: ubuntu-latest
-#     permissions:
-#       contents: write
-#     steps:
-#       - uses: actions/checkout@v4
-#         with:
-#           fetch-depth: 0
-
-#       - name: Bump tag
-#         id: tag
-#         uses: anothrNick/github-tag-action@v1
-#         env:
-#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#           DEFAULT_BUMP: patch
-#           WITH_V: true
-
-#       - name: Create release
-#         uses: softprops/action-gh-release@v2
-#         with:
-#           tag_name: ${{ steps.tag.outputs.new_tag }}
-#           generate_release_notes: true
-#           make_latest: true
 name: release
+
 on:
   push:
     branches: [dev]
 
+permissions:
+  contents: write
+  actions: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      actions: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -56,12 +29,9 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.new_tag }}
 
+      # A release created with GITHUB_TOKEN does not start other workflows, so
+      # publish is dispatched explicitly against the new tag.
       - name: Start publish
-        run: gh workflow run publish.yml --ref ${{ steps.tag.outputs.new_tag }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Trigger publish
         run: gh workflow run publish.yml --ref ${{ steps.tag.outputs.new_tag }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

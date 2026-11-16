@@ -72,7 +72,7 @@ Most tools are designed to be simple, fast, and cross-platform; `killNotif` is W
 
 ## Installation
 
-Python 3.14.7 or newer is required.
+Python 3.11 or newer is required.
 
 ### Install from PyPI with pipx
 
@@ -232,7 +232,7 @@ make test
 
 ## Requirements
 
-- Python 3.14.7+
+- Python 3.11+
 - Typer
 - Rich
 - psutil

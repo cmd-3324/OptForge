@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 import shutil
+import sys
 from collections.abc import Callable, Iterable
 from typing import Any
 
 from optforge.pycacheclean.models import CacheTarget, CleanFailure, CleanReport
 
 Remover = Callable[..., Any]
+
+# ``shutil.rmtree`` reports per-file errors through ``onexc`` from 3.12 on;
+# ``onerror`` is the spelling available on 3.11.
+_HAS_ONEXC = sys.version_info >= (3, 12)
 
 
 class CacheCleaner:
@@ -30,13 +35,18 @@ class CacheCleaner:
             def on_error(
                 _func: Any,
                 path: str,
-                exc: BaseException,
+                exc: BaseException | tuple[type[BaseException], BaseException, Any],
                 errors: list[str] = errors,
             ) -> None:
-                errors.append(f"{path}: {exc}")
+                # ``onexc`` passes the exception; ``onerror`` passes exc_info.
+                detail = exc if isinstance(exc, BaseException) else exc[1]
+                errors.append(f"{path}: {detail}")
 
             try:
-                self._remover(target.path, onexc=on_error)
+                if _HAS_ONEXC:
+                    self._remover(target.path, onexc=on_error)
+                else:
+                    self._remover(target.path, onerror=on_error)
             except OSError as exc:
                 failed.append(CleanFailure(path=target.path, error=str(exc)))
                 continue

@@ -5,6 +5,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from optforge.cli import app as dispatcher
+from optforge.core.version import get_version
 from optforge.diskcheck.cli import app as diskcheck_app
 from optforge.pycacheclean.cli import app as pycache_app
 
@@ -14,7 +15,7 @@ runner = CliRunner()
 def test_dispatcher_version() -> None:
     result = runner.invoke(dispatcher, ["--version"])
     assert result.exit_code == 0
-    assert "0.3.0" in result.stdout
+    assert get_version() in result.stdout
 
 
 def test_dispatcher_exposes_killnotif() -> None:

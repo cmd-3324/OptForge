@@ -1,35 +1,5 @@
-# name: CI
-
-# "on":
-#   push:
-#     branches: [main, dev]
-#   pull_request:
-
-# permissions:
-#   contents: read
-
-# jobs:
-#   test:
-#     name: ${{ matrix.os }} / Python ${{ matrix.python }}
-#     runs-on: ${{ matrix.os }}
-#     strategy:
-#       fail-fast: false
-#       matrix:
-#         os: [ubuntu-latest, windows-latest, macos-latest]
-#         python: ["3.13", "3.14.7"]
-#     steps:
-#       - uses: actions/checkout@v4
-#       - uses: astral-sh/setup-uv@v5
-#         with:
-#           python-version: ${{ matrix.python }}
-#           enable-cache: true
-#       - run: uv sync --all-extras
-#       - run: uv run ruff check .
-#       - run: uv run mypy src
-#       - run: uv run pytest
-# #
-
 name: CI
+
 on:
   push:
     branches: [main, dev]
@@ -40,13 +10,35 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.11", "3.14"]
+    env:
+      # Overrides .python-version so the matrix, not the local pin, selects the interpreter.
+      UV_PYTHON: ${{ matrix.python }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: astral-sh/setup-uv@v5
         with:
+          python-version: ${{ matrix.python }}
           enable-cache: true
-      - run: uv sync
-      - run: uv run ruff check .
-      - run: uv run mypy src
-      - run: uv run pytest
+
+      - name: Install
+        run: uv sync --all-extras
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format
+        run: uv run ruff format --check .
+
+      - name: Typecheck
+        run: uv run mypy src
+
+      - name: Test
+        run: uv run pytest

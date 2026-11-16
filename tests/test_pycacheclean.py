@@ -78,10 +78,9 @@ def test_cleaner_reports_partial_errors(tmp_path: Path) -> None:
     target.mkdir()
 
     def partial(_path: Path, **kwargs: object) -> None:
-        # The package passes ``onexc`` on 3.12+ and ``onerror`` on 3.11.
-        callback = kwargs.get("onexc", kwargs.get("onerror"))
+        callback = kwargs["onerror"]
         assert callable(callback)
-        callback(None, str(target), OSError("partial"))
+        callback(None, str(target), (OSError, OSError("partial"), None))
 
     report = CacheCleaner(remover=partial).clean([CacheTarget(path=target)])
     assert report.ok is False

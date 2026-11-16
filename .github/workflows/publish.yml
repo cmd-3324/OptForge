@@ -1,8 +1,8 @@
 name: publish
 
 on:
-  release:
-    types: [published]
+  push:
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -16,11 +16,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Write version from the release tag
+      - name: Write version from the tag
         env:
-          # A release event carries the tag; a manual run carries whatever ref
-          # was selected, which must also be a tag.
-          TAG: ${{ github.event.release.tag_name || github.ref_name }}
+          TAG: ${{ github.ref_name }}
         run: |
           version="${TAG#v}"
           if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.+|-][0-9A-Za-z.-]+)?$ ]]; then

@@ -18,14 +18,14 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python: ["3.11", "3.14"]
     env:
-      # Overrides .python-version so the matrix, not the local pin, selects the interpreter.
+      # The matrix, not the repository's .python-version pin, selects the
+      # interpreter. uv downloads it if the runner does not have it.
       UV_PYTHON: ${{ matrix.python }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: astral-sh/setup-uv@v5
         with:
-          python-version: ${{ matrix.python }}
           enable-cache: true
 
       - name: Install

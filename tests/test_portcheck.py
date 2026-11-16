@@ -81,19 +81,21 @@ def test_models_serialize() -> None:
     assert PortState.used.value == "used"
 
 
-def test_binder_rejects_unresolvable_explicit_host(monkeypatch: pytest.MonkeyPatch) -> None:
-    def broken(*_args: object, **_kwargs: object) -> list[object]:
-        raise OperationFailed("Could not resolve 'nope.invalid'")
+@pytest.fixture()
+def unresolvable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make every address resolution fail."""
 
-    monkeypatch.setattr(binder_module, "resolve_endpoints", broken)
+    def fail(*_args: object, **_kwargs: object) -> list[object]:
+        raise OperationFailed("no address of this family")
+
+    monkeypatch.setattr(binder_module, "resolve_endpoints", fail)
+
+
+def test_binder_rejects_unresolvable_explicit_host(unresolvable: None) -> None:
     with pytest.raises(OperationFailed):
         PortBinder().is_free(8000, "nope.invalid")
 
 
-def test_binder_treats_missing_address_family_as_free(monkeypatch: pytest.MonkeyPatch) -> None:
-    def broken(*_args: object, **_kwargs: object) -> list[object]:
-        raise OperationFailed("no IPv6 address")
-
-    monkeypatch.setattr(binder_module, "resolve_endpoints", broken)
+def test_binder_treats_missing_address_family_as_free(unresolvable: None) -> None:
     assert PortBinder().is_free(8000, "::") is True
     assert PortBinder().is_free_on_all_interfaces(8000) is True

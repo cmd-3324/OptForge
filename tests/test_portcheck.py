@@ -1,14 +1,20 @@
 from __future__ import annotations
 
+import socket
 from collections.abc import Iterable
+from types import SimpleNamespace
 from typing import Any
 
+import psutil
 import pytest
 
-from optforge.core.errors import OperationFailed
+from optforge.core.errors import OperationFailed, PermissionDenied
+from optforge.core.net import Endpoint
 from optforge.portcheck import binder as binder_module
 from optforge.portcheck.binder import PortBinder
+from optforge.portcheck.connector import Connector, _reason
 from optforge.portcheck.models import Listener, PortState, SortKey, scope_for
+from optforge.portcheck.scanner import ListenerScanner
 from optforge.portcheck.service import PortService
 from optforge.portcheck.waiter import PortWaiter
 
@@ -99,3 +105,214 @@ def test_binder_rejects_unresolvable_explicit_host(unresolvable: None) -> None:
 def test_binder_treats_missing_address_family_as_free(unresolvable: None) -> None:
     assert PortBinder().is_free(8000, "::") is True
     assert PortBinder().is_free_on_all_interfaces(8000) is True
+
+
+def listening_socket() -> socket.socket:
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(("127.0.0.1", 0))
+    server.listen(1)
+    return server
+
+
+def free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        return int(probe.getsockname()[1])
+
+
+def test_connector_connects_to_a_real_listener() -> None:
+    server = listening_socket()
+    port = server.getsockname()[1]
+    try:
+        result = Connector().connect("127.0.0.1", port, 2.0)
+    finally:
+        server.close()
+
+    assert result.ok is True
+    assert result.endpoint == f"127.0.0.1:{port}"
+    assert result.seconds is not None
+    assert result.seconds >= 0.0
+
+
+def test_connector_reports_a_closed_port_as_refused() -> None:
+    server = listening_socket()
+    port = server.getsockname()[1]
+    server.close()
+
+    result = Connector().connect("127.0.0.1", port, 0.5)
+    assert result.ok is False
+    # Windows can drop the loopback reset and report a timeout instead of a refusal.
+    assert result.error in {"connection refused", "timed out"}
+
+
+def test_connector_falls_through_to_the_next_endpoint() -> None:
+    server = listening_socket()
+    good_port = server.getsockname()[1]
+    # An unusable address family fails instantly and leaves budget for the next
+    # endpoint; a refused port can consume the whole deadline instead.
+    endpoints = [
+        Endpoint(999_999, ("127.0.0.1", 80)),
+        Endpoint(socket.AF_INET, ("127.0.0.1", good_port)),
+    ]
+    try:
+        result = Connector(resolver=lambda *_args: endpoints).connect("127.0.0.1", good_port, 2.0)
+    finally:
+        server.close()
+
+    assert result.ok is True
+    assert result.endpoint == f"127.0.0.1:{good_port}"
+
+
+def test_connector_honours_the_deadline_between_endpoints() -> None:
+    endpoints = [Endpoint(socket.AF_INET, ("127.0.0.1", 1)), Endpoint(socket.AF_INET, ("127.0.0.1", 2))]
+    ticks = iter([0.0, 5.0])
+
+    result = Connector(resolver=lambda *_args: endpoints, clock=lambda: next(ticks)).connect("127.0.0.1", 1, 2.0)
+    assert result.ok is False
+    assert result.error == "timed out after 2s"
+
+
+def test_connector_reports_a_resolution_failure() -> None:
+    def broken(*_args: object, **_kwargs: object) -> list[Endpoint]:
+        raise OperationFailed("Could not resolve 'nope.invalid'")
+
+    result = Connector(resolver=broken).connect("nope.invalid", 80, 1.0)
+    assert result.ok is False
+    assert result.error == "Could not resolve 'nope.invalid'"
+
+
+def test_connector_reports_when_there_is_no_endpoint() -> None:
+    result = Connector(resolver=lambda *_args: []).connect("example.invalid", 80, 1.0)
+    assert result.ok is False
+    assert result.error == "no endpoint accepted the connection"
+
+
+def test_connector_survives_an_unusable_endpoint() -> None:
+    endpoints = [Endpoint(999_999, ("127.0.0.1", 80))]
+
+    result = Connector(resolver=lambda *_args: endpoints).connect("127.0.0.1", 80, 1.0)
+    assert result.ok is False
+    assert result.error
+
+
+@pytest.mark.parametrize(
+    ("exc", "expected"),
+    [
+        (ConnectionRefusedError(111, "refused"), "connection refused"),
+        (TimeoutError("slow"), "timed out"),
+        (OSError(101, "unreachable"), "unreachable"),
+        (OSError("plain message"), "plain message"),
+    ],
+)
+def test_reason_maps_socket_errors(exc: OSError, expected: str) -> None:
+    assert _reason(exc) == expected
+
+
+def test_binder_reports_a_bound_port_as_busy() -> None:
+    server = listening_socket()
+    port = server.getsockname()[1]
+    try:
+        assert PortBinder().is_free(port, "127.0.0.1") is False
+    finally:
+        server.close()
+
+
+def test_binder_reports_a_free_port_as_free() -> None:
+    assert PortBinder().is_free(free_port(), "127.0.0.1") is True
+
+
+class FakeResolver:
+    def name(self, pid: int | None) -> str:
+        return "-" if pid is None else f"pid-{pid}"
+
+
+def connection(
+    port: int,
+    *,
+    address: str = "0.0.0.0",
+    pid: int | None = 1,
+    status: str = "LISTEN",
+    family: int = socket.AF_INET,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        status=status,
+        laddr=SimpleNamespace(ip=address, port=port),
+        pid=pid,
+        family=family,
+    )
+
+
+def test_scanner_filters_deduplicates_and_sorts() -> None:
+    rows = [
+        connection(9000, pid=3),
+        connection(8000, address="127.0.0.1", pid=2),
+        connection(8000, address="127.0.0.1", pid=2),
+        connection(7000, status="ESTABLISHED", pid=4),
+    ]
+    scanner = ListenerScanner(provider=lambda **_kwargs: rows, resolver=FakeResolver())
+
+    listeners = scanner.scan()
+    assert [(row.port, row.address, row.pid) for row in listeners] == [
+        (8000, "127.0.0.1", 2),
+        (9000, "0.0.0.0", 3),
+    ]
+    assert listeners[1].process == "pid-3"
+    assert listeners[1].family == "ipv4"
+    assert listeners[1].scope == "all interfaces"
+
+
+def test_scanner_falls_back_to_wildcard_addresses() -> None:
+    rows = [
+        connection(8080, address="", family=socket.AF_INET6),
+        connection(8081, address=""),
+    ]
+    scanner = ListenerScanner(provider=lambda **_kwargs: rows, resolver=FakeResolver())
+
+    listeners = scanner.scan()
+    assert [(row.port, row.address, row.family) for row in listeners] == [
+        (8080, "::", "ipv6"),
+        (8081, "0.0.0.0", "ipv4"),
+    ]
+
+
+def test_scanner_skips_sockets_without_a_local_address() -> None:
+    rows = [SimpleNamespace(status="LISTEN", laddr=None, pid=1, family=socket.AF_INET)]
+    scanner = ListenerScanner(provider=lambda **_kwargs: rows, resolver=FakeResolver())
+
+    assert scanner.scan() == []
+
+
+def test_scanner_reports_an_unknown_owner_as_dash() -> None:
+    rows = [connection(8000, pid=None)]
+    scanner = ListenerScanner(provider=lambda **_kwargs: rows, resolver=FakeResolver())
+
+    assert scanner.scan()[0].process == "-"
+
+
+def test_scanner_maps_access_denied_to_permission_denied() -> None:
+    def denied(**_kwargs: object) -> list[object]:
+        raise psutil.AccessDenied(pid=1)
+
+    with pytest.raises(PermissionDenied):
+        ListenerScanner(provider=denied, resolver=FakeResolver()).scan()
+
+
+def test_scanner_maps_os_errors_to_permission_denied() -> None:
+    def broken(**_kwargs: object) -> list[object]:
+        raise OSError("socket table unavailable")
+
+    with pytest.raises(PermissionDenied):
+        ListenerScanner(provider=broken, resolver=FakeResolver()).scan()
+
+
+def test_scanner_asks_for_tcp_only_and_owners_filter_by_port() -> None:
+    seen: list[dict[str, object]] = []
+    rows = [connection(8000), connection(9000)]
+
+    def provider(**kwargs: object) -> list[SimpleNamespace]:
+        seen.append(kwargs)
+        return rows
+
+    scanner = ListenerScanner(provider=provider, resolver=FakeResolver())
+    assert [row.port for row in scanner.owners(8000)] == [8000]
+    assert seen[0] == {"kind": "tcp"}

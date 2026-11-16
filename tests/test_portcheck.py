@@ -12,7 +12,7 @@ from optforge.core.errors import OperationFailed, PermissionDenied
 from optforge.core.net import Endpoint
 from optforge.portcheck import binder as binder_module
 from optforge.portcheck.binder import PortBinder
-from optforge.portcheck.connector import Connector, _reason
+from optforge.portcheck.connector import Connector, _attempt_budget, _reason
 from optforge.portcheck.models import Listener, PortState, SortKey, scope_for
 from optforge.portcheck.scanner import ListenerScanner
 from optforge.portcheck.service import PortService
@@ -145,17 +145,17 @@ def test_connector_reports_a_closed_port_as_refused() -> None:
     assert result.error in {"connection refused", "timed out"}
 
 
-def test_connector_falls_through_to_the_next_endpoint() -> None:
+def test_connector_does_not_let_a_slow_endpoint_starve_the_next() -> None:
     server = listening_socket()
     good_port = server.getsockname()[1]
-    # An unusable address family fails instantly and leaves budget for the next
-    # endpoint; a refused port can consume the whole deadline instead.
+    # A closed loopback port blackholes the SYN on Windows, so this first
+    # endpoint used to consume the whole budget and the second was never tried.
     endpoints = [
-        Endpoint(999_999, ("127.0.0.1", 80)),
+        Endpoint(socket.AF_INET, ("127.0.0.1", free_port())),
         Endpoint(socket.AF_INET, ("127.0.0.1", good_port)),
     ]
     try:
-        result = Connector(resolver=lambda *_args: endpoints).connect("127.0.0.1", good_port, 2.0)
+        result = Connector(resolver=lambda *_args: endpoints).connect("127.0.0.1", good_port, 1.0)
     finally:
         server.close()
 
@@ -185,6 +185,20 @@ def test_connector_reports_when_there_is_no_endpoint() -> None:
     result = Connector(resolver=lambda *_args: []).connect("example.invalid", 80, 1.0)
     assert result.ok is False
     assert result.error == "no endpoint accepted the connection"
+
+
+@pytest.mark.parametrize(
+    ("remaining", "endpoints_left", "expected"),
+    [
+        (2.0, 2, 1.0),
+        (2.0, 4, 0.5),
+        (2.0, 1, 2.0),
+        (1.0, 100, 0.05),
+        (0.04, 10, 0.04),
+    ],
+)
+def test_attempt_budget_shares_the_remaining_deadline(remaining: float, endpoints_left: int, expected: float) -> None:
+    assert _attempt_budget(remaining, endpoints_left) == pytest.approx(expected)
 
 
 def test_connector_survives_an_unusable_endpoint() -> None:

@@ -9,11 +9,13 @@ import pytest
 from typer.testing import CliRunner
 
 from optforge.cli import app as dispatcher
+from optforge.core.errors import OptForgeError
 from optforge.core.version import get_version
 from optforge.diskcheck.cli import app as diskcheck_app
 from optforge.envcheck.cli import app as envcheck_app
 from optforge.killNotif import cli as killnotif_cli
 from optforge.portcheck.cli import app as portcheck_app
+from optforge.portcheck.scanner import ListenerScanner
 from optforge.pycacheclean.cli import app as pycache_app
 
 runner = CliRunner()
@@ -70,8 +72,18 @@ def test_portcheck_check_answers_no_for_a_busy_port() -> None:
         assert runner.invoke(portcheck_app, ["check", port, "--expect", "free", "-H", "127.0.0.1"]).exit_code == 1
 
 
+def _socket_table_readable() -> bool:
+    try:
+        ListenerScanner().scan()
+    except OptForgeError:
+        return False
+    return True
+
+
 def test_portcheck_find_answers_no_for_a_free_port() -> None:
-    assert runner.invoke(portcheck_app, ["find", str(_free_port())]).exit_code == 1
+    result = runner.invoke(portcheck_app, ["find", str(_free_port())])
+    # macOS hides the socket table from normal users, where "could not run" is the honest answer.
+    assert result.exit_code == (1 if _socket_table_readable() else 3)
 
 
 def test_portcheck_rejects_an_out_of_range_port() -> None:

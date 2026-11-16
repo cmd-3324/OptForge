@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Callable
 from typing import Any
 
+from optforge.core.errors import PermissionDenied
 from optforge.portcheck.binder import PortBinder
 from optforge.portcheck.connector import Connector
 from optforge.portcheck.models import (
@@ -63,8 +65,14 @@ class PortService:
         return [row for row in self._scanner.scan() if row.port == port]
 
     def check(self, port: int, host: str = DEFAULT_HOST) -> CheckResult:
-        """Answer whether ``port`` is free, using owners plus a bind probe."""
-        owners = self.find(port)
+        """Answer whether ``port`` is free, using owners plus a bind probe.
+
+        The bind probe answers on its own, so an unreadable socket table (macOS
+        without root) degrades to "no owner details" instead of failing.
+        """
+        owners: list[Listener] = []
+        with contextlib.suppress(PermissionDenied):
+            owners = self.find(port)
         bindable = self._binder.is_free(port, host)
         return CheckResult(
             port=port,

@@ -222,6 +222,27 @@ def test_reason_maps_socket_errors(exc: OSError, expected: str) -> None:
     assert _reason(exc) == expected
 
 
+class UnreadableScanner:
+    def scan(self) -> list[Listener]:
+        raise PermissionDenied("Run as Administrator (Windows) or with sudo (Linux/macOS).")
+
+
+def test_check_answers_from_the_bind_probe_without_a_socket_table() -> None:
+    service = PortService(scanner=UnreadableScanner(), binder=PortBinder())
+
+    free = service.check(free_port(), "127.0.0.1")
+    assert free.owners == []
+    assert free.in_use is False
+
+    server = listening_socket()
+    try:
+        busy = service.check(int(server.getsockname()[1]), "127.0.0.1")
+    finally:
+        server.close()
+    assert busy.owners == []
+    assert busy.in_use is True
+
+
 def test_binder_reports_a_bound_port_as_busy() -> None:
     server = listening_socket()
     port = server.getsockname()[1]

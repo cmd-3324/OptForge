@@ -31,6 +31,23 @@ jobs:
       - name: Install
         run: uv sync --all-extras
 
+      # A matrix entry that silently runs on the runner's default Python would
+      # hide the 3.11 floor regressing, so assert it before anything else runs.
+      - name: Verify the matrix interpreter
+        shell: bash
+        env:
+          EXPECTED: ${{ matrix.python }}
+        run: |
+          actual="$(uv run python -V 2>&1)"
+          echo "$actual"
+          case "$actual" in
+            "Python ${EXPECTED}."*) ;;
+            *)
+              echo "::error::expected Python ${EXPECTED}.x from the matrix, got '$actual'"
+              exit 1
+              ;;
+          esac
+
       - name: Lint
         run: uv run ruff check .
 
@@ -40,5 +57,7 @@ jobs:
       - name: Typecheck
         run: uv run mypy src
 
+      # The coverage floor lives in [tool.coverage.report] so `make test` and
+      # CI enforce the same number.
       - name: Test
-        run: uv run pytest
+        run: uv run pytest --cov=optforge --cov-report=term-missing

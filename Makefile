@@ -9,7 +9,7 @@ help:
 	@echo "  format       Format with ruff"
 	@echo "  format-check Verify formatting without changing files"
 	@echo "  typecheck    Run mypy"
-	@echo "  test         Run pytest"
+	@echo "  test         Run pytest with the coverage gate"
 	@echo "  check        lint + format-check + typecheck + test"
 	@echo "  build        Build sdist and wheel"
 	@echo "  clean        Remove caches and build artifacts"
@@ -30,7 +30,7 @@ typecheck:
 	$(UV) run mypy src
 
 test:
-	$(UV) run pytest
+	$(UV) run pytest --cov=optforge --cov-report=term-missing
 
 check: lint format-check typecheck test
 

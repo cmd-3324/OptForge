@@ -61,7 +61,3 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Trigger publish
-        run: gh workflow run publish.yml --ref ${{ steps.tag.outputs.new_tag }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
